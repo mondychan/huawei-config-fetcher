@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.prompt import Prompt
 from rich.table import Table
 
@@ -287,7 +288,26 @@ def backup_configs(
                 )
 
     base_dir = _backup_dir()
-    results = backup_mod.run_backup(cfg, data_key, base_dir, approved_devices, lambda *_: False)
+    results = []
+    if approved_devices:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task_id = progress.add_task("Backing up devices", total=len(approved_devices))
+
+            def on_result(item: dict) -> None:
+                progress.update(task_id, advance=1, description=f"Backup: {item.get('device', '-')}")
+
+            results = backup_mod.run_backup(
+                cfg, data_key, base_dir, approved_devices, lambda *_: False, on_result=on_result
+            )
+            progress.update(task_id, description="Backup complete")
 
     config_mod.save_config(cfg, path)
 

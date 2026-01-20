@@ -3,7 +3,7 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 from . import storage
 from .models import Config, Device
@@ -12,6 +12,7 @@ from .ssh_client import HostKeyCallback, fetch_device_config
 
 
 Result = Dict[str, str]
+ResultCallback = Callable[[Result], None]
 
 
 def _auto_workers(device_count: int) -> int:
@@ -59,6 +60,7 @@ def run_backup(
     base_dir: Path,
     devices: List[Device],
     host_key_callback: HostKeyCallback,
+    on_result: Optional[ResultCallback] = None,
 ) -> List[Result]:
     if not devices:
         return []
@@ -74,8 +76,11 @@ def run_backup(
         for future in as_completed(futures):
             device = futures[future]
             try:
-                results.append(future.result())
+                result = future.result()
             except Exception as exc:
-                results.append({"device": device.name, "status": "error", "reason": str(exc)})
+                result = {"device": device.name, "status": "error", "reason": str(exc)}
+            results.append(result)
+            if on_result is not None:
+                on_result(result)
 
     return results
