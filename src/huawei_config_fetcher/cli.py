@@ -257,20 +257,36 @@ def backup_configs(
     approved_devices: List[Device] = []
     pending_prompts = []
 
-    for device in devices:
-        fingerprint, error = ssh_client.fetch_host_fingerprint(device)
-        host_id = f"{device.host}:{device.port}"
-        if error:
-            preflight_results.append(
-                {"device": device.name, "status": "error", "reason": error}
-            )
-            continue
+    if devices:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task_id = progress.add_task("Checking host keys", total=len(devices))
 
-        known_fp = cfg.known_hosts.get(host_id)
-        if known_fp == fingerprint:
-            approved_devices.append(device)
-        else:
-            pending_prompts.append((device, host_id, fingerprint, known_fp))
+            for device in devices:
+                progress.update(task_id, description=f"Host key: {device.name}")
+                fingerprint, error = ssh_client.fetch_host_fingerprint(device)
+                host_id = f"{device.host}:{device.port}"
+                if error:
+                    preflight_results.append(
+                        {"device": device.name, "status": "error", "reason": error}
+                    )
+                    progress.update(task_id, advance=1)
+                    continue
+
+                known_fp = cfg.known_hosts.get(host_id)
+                if known_fp == fingerprint:
+                    approved_devices.append(device)
+                else:
+                    pending_prompts.append((device, host_id, fingerprint, known_fp))
+                progress.update(task_id, advance=1)
+
+            progress.update(task_id, description="Host key check complete")
 
     if non_interactive:
         for device, _host_id, _fp, _known in pending_prompts:
