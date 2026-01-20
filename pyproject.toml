@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "huawei-config-fetcher"
+version = "0.1.0"
+description = "Read-only CLI tool to fetch configs from Huawei devices over SSH"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+keywords = ["huawei", "ssh", "backup", "cli"]
+
+dependencies = [
+  "typer>=0.12.3",
+  "rich>=13.7.0",
+  "paramiko>=3.4.0",
+  "keyring>=25.0.0",
+  "toml>=0.10.2",
+  "cryptography>=42.0.0",
+]
+
+[project.scripts]
+hcf = "huawei_config_fetcher.cli:app"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["huawei_config_fetcher"]

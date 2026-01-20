@@ -1,0 +1,23 @@
+﻿version = 1
+
+[security]
+kdf = "scrypt"
+salt = "REPLACE_ME"
+wrap_nonce = "REPLACE_ME"
+wrapped_key = "REPLACE_ME"
+keyring_service = "huawei-config-fetcher"
+keyring_user = "REPLACE_ME"
+
+[settings]
+workers = 0
+
+[known_hosts]
+"192.0.2.1:22" = "SHA256:REPLACE_ME"
+
+[[devices]]
+id = 1
+name = "core-1"
+host = "192.0.2.1"
+port = 22
+username = "admin"
+password = "REPLACE_ME"
