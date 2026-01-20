@@ -3,7 +3,8 @@
 import base64
 import hashlib
 import time
-from typing import Callable, Optional
+import socket
+from typing import Callable, Optional, Tuple
 
 import paramiko
 
@@ -37,6 +38,63 @@ def _read_until_quiet(channel: paramiko.Channel, quiet: float, overall: float) -
             time.sleep(0.1)
 
     return b"".join(chunks).decode("utf-8", errors="ignore")
+
+def fetch_host_fingerprint(device: Device, connect_timeout: float = 10.0) -> Tuple[Optional[str], Optional[str]]:
+    transport: Optional[paramiko.Transport] = None
+    try:
+        sock = socket.create_connection((device.host, device.port), timeout=connect_timeout)
+        transport = paramiko.Transport(sock)
+        transport.banner_timeout = connect_timeout
+        transport.start_client(timeout=connect_timeout)
+
+        remote_key = transport.get_remote_server_key()
+        fingerprint = _fingerprint_sha256(remote_key)
+        return fingerprint, None
+    except Exception as exc:
+        return None, str(exc)
+    finally:
+        if transport is not None:
+            try:
+                transport.close()
+            except Exception:
+                pass
+
+def check_host_key(
+    device: Device,
+    known_hosts: dict,
+    host_key_callback: HostKeyCallback,
+    connect_timeout: float = 10.0,
+) -> Tuple[bool, Optional[str]]:
+    transport: Optional[paramiko.Transport] = None
+    try:
+        sock = socket.create_connection((device.host, device.port), timeout=connect_timeout)
+        transport = paramiko.Transport(sock)
+        transport.banner_timeout = connect_timeout
+        transport.start_client(timeout=connect_timeout)
+
+        remote_key = transport.get_remote_server_key()
+        fingerprint = _fingerprint_sha256(remote_key)
+        host_id = f"{device.host}:{device.port}"
+        known_fp = known_hosts.get(host_id)
+
+        if known_fp is None:
+            if not host_key_callback(host_id, fingerprint, None):
+                return False, "host-key"
+            known_hosts[host_id] = fingerprint
+        elif known_fp != fingerprint:
+            if not host_key_callback(host_id, fingerprint, known_fp):
+                return False, "host-key"
+            known_hosts[host_id] = fingerprint
+
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+    finally:
+        if transport is not None:
+            try:
+                transport.close()
+            except Exception:
+                pass
 
 
 def fetch_device_config(

@@ -11,6 +11,7 @@ from rich.table import Table
 from huawei_config_fetcher import backup as backup_mod
 from huawei_config_fetcher import config as config_mod
 from huawei_config_fetcher import secrets
+from huawei_config_fetcher import ssh_client
 from huawei_config_fetcher.models import Config, Device, SecurityConfig, Settings
 
 app = typer.Typer(add_completion=False, no_args_is_help=False)
@@ -240,9 +241,7 @@ def backup_configs(
     if device_id:
         devices = [d for d in cfg.devices if d.id in device_id]
 
-    def host_key_callback(host_id: str, new_fp: str, old_fp: Optional[str]) -> bool:
-        if non_interactive:
-            return False
+    def prompt_host_key(host_id: str, new_fp: str, old_fp: Optional[str]) -> bool:
         if old_fp is None:
             prompt = f"Unknown host key for {host_id}: {new_fp}. Trust and continue?"
         else:
@@ -253,8 +252,42 @@ def backup_configs(
             )
         return typer.confirm(prompt)
 
+    preflight_results = []
+    approved_devices: List[Device] = []
+    pending_prompts = []
+
+    for device in devices:
+        fingerprint, error = ssh_client.fetch_host_fingerprint(device)
+        host_id = f"{device.host}:{device.port}"
+        if error:
+            preflight_results.append(
+                {"device": device.name, "status": "error", "reason": error}
+            )
+            continue
+
+        known_fp = cfg.known_hosts.get(host_id)
+        if known_fp == fingerprint:
+            approved_devices.append(device)
+        else:
+            pending_prompts.append((device, host_id, fingerprint, known_fp))
+
+    if non_interactive:
+        for device, _host_id, _fp, _known in pending_prompts:
+            preflight_results.append(
+                {"device": device.name, "status": "skipped", "reason": "host-key"}
+            )
+    else:
+        for device, host_id, fp, known_fp in pending_prompts:
+            if prompt_host_key(host_id, fp, known_fp):
+                cfg.known_hosts[host_id] = fp
+                approved_devices.append(device)
+            else:
+                preflight_results.append(
+                    {"device": device.name, "status": "skipped", "reason": "host-key"}
+                )
+
     base_dir = _backup_dir()
-    results = backup_mod.run_backup(cfg, data_key, base_dir, devices, host_key_callback)
+    results = backup_mod.run_backup(cfg, data_key, base_dir, approved_devices, lambda *_: False)
 
     config_mod.save_config(cfg, path)
 
@@ -263,7 +296,7 @@ def backup_configs(
     table.add_column("Status")
     table.add_column("Detail")
 
-    for item in results:
+    for item in preflight_results + results:
         status = item.get("status", "-")
         detail = item.get("hash") or item.get("reason") or "-"
         table.add_row(item.get("device", "-"), status, detail)
