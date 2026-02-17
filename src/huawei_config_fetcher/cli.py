@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,6 +29,17 @@ def _load_config(path: Path) -> Config:
 
 
 def _get_data_key(cfg: Config, config_path: Path, non_interactive: bool) -> bytes:
+    try:
+        env_key = secrets.data_key_from_env(
+            cfg.security.salt_b64,
+            cfg.security.wrap_nonce_b64,
+            cfg.security.wrapped_key_b64,
+        )
+    except Exception as exc:
+        raise typer.BadParameter("Invalid master password from env.") from exc
+    if env_key:
+        return env_key
+
     data_key = secrets.get_keyring_data_key(cfg.security.keyring_service, cfg.security.keyring_user)
     if data_key:
         return data_key
@@ -53,6 +65,13 @@ def _get_data_key(cfg: Config, config_path: Path, non_interactive: bool) -> byte
 def _backup_dir(base_dir: Optional[Path] = None) -> Path:
     root = base_dir or Path.cwd()
     return root / "backups"
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 def _prompt_device_ids() -> Optional[List[int]]:
     raw = Prompt.ask("Device IDs (comma separated, empty = all)", default="")
@@ -116,7 +135,7 @@ def main(
 def init_config(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     if path.exists():
         console.print(f"Config already exists at {path}")
         raise typer.Exit(code=1)
@@ -149,7 +168,7 @@ def init_config(
 def reset_config(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     cfg = _load_config(path)
 
     if not typer.confirm("Reset master password and clear stored credentials?"):
@@ -181,7 +200,7 @@ def reset_config(
 def add_device(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     cfg = _load_config(path)
     data_key = _get_data_key(cfg, path, non_interactive=False)
 
@@ -212,7 +231,7 @@ def add_device(
 def list_devices(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     cfg = _load_config(path)
 
     table = Table(title="Devices")
@@ -233,10 +252,21 @@ def backup_configs(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
     device_id: Optional[List[int]] = typer.Option(None, "--device-id", help="Device id(s) to back up"),
     non_interactive: bool = typer.Option(False, "--non-interactive", help="Fail or skip prompts"),
+    auto_trust_host_keys: Optional[bool] = typer.Option(
+        None,
+        "--auto-trust-host-keys/--no-auto-trust-host-keys",
+        help="Automatically trust new or changed host keys",
+    ),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     cfg = _load_config(path)
     data_key = _get_data_key(cfg, path, non_interactive=non_interactive)
+
+    auto_trust = (
+        auto_trust_host_keys
+        if auto_trust_host_keys is not None
+        else _env_bool("HCF_AUTO_TRUST_HOST_KEYS", False)
+    )
 
     devices = cfg.devices
     if device_id:
@@ -288,7 +318,11 @@ def backup_configs(
 
             progress.update(task_id, description="Host key check complete")
 
-    if non_interactive:
+    if auto_trust:
+        for device, host_id, fp, _known in pending_prompts:
+            cfg.known_hosts[host_id] = fp
+            approved_devices.append(device)
+    elif non_interactive:
         for device, _host_id, _fp, _known in pending_prompts:
             preflight_results.append(
                 {"device": device.name, "status": "skipped", "reason": "host-key"}
@@ -345,7 +379,7 @@ def show_backups(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Path to config.toml"),
     device_id: Optional[List[int]] = typer.Option(None, "--device-id", help="Device id(s)"),
 ) -> None:
-    path = config_path or config_mod.default_config_path()
+    path = config_mod.resolve_config_path(config_path)
     cfg = _load_config(path)
 
     from huawei_config_fetcher import storage

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Backups - Huawei Config Fetcher</title>
+    <style>
+      @font-face {
+        font-family: "Brockmann";
+        src: url("/fonts/brockmann-medium.otf") format("opentype");
+        font-weight: 500;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --royal-blue: #3700a6;
+        --dark-blue: #121252;
+        --cyan: #00cfff;
+        --green: #67e796;
+        --yellow: #ceff2d;
+        --ink: #f5f7ff;
+        --muted: #c9ccf2;
+        --card: rgba(255, 255, 255, 0.95);
+        --card-ink: #121252;
+        --card-muted: #4b4e88;
+        --accent: #3700a6;
+        --stroke: rgba(18, 18, 82, 0.12);
+        --shadow: 0 25px 60px rgba(9, 9, 35, 0.35);
+        --radius: 18px;
+        --gradient: linear-gradient(120deg, var(--cyan), var(--green), var(--yellow));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Brockmann", "Arial", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 12% 12%, rgba(0, 207, 255, 0.25) 0, transparent 45%),
+          radial-gradient(circle at 88% 8%, rgba(103, 231, 150, 0.18) 0, transparent 50%),
+          radial-gradient(circle at 72% 82%, rgba(206, 255, 45, 0.18) 0, transparent 45%),
+          repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 28px),
+          linear-gradient(160deg, #121252 0%, #1f1f6e 45%, #3700a6 100%);
+        min-height: 100vh;
+      }
+
+      .app {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 36px 24px 56px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 4vw, 36px);
+      }
+
+      .sub {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 20px;
+        border: 1px solid var(--stroke);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+        color: var(--card-ink);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        padding: 10px 16px;
+        border: 1px solid rgba(55, 0, 166, 0.3);
+        color: var(--royal-blue);
+        background: rgba(55, 0, 166, 0.08);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .link-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(55, 0, 166, 0.2);
+      }
+
+      .meta {
+        color: var(--card-muted);
+        font-size: 13px;
+      }
+
+      .list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.85);
+        flex-wrap: wrap;
+      }
+
+      .row strong {
+        display: block;
+      }
+
+      .hash {
+        color: var(--card-muted);
+        word-break: break-all;
+        font-size: 12px;
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .size {
+        color: var(--card-muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <div>
+          <h1>Backups for {{ device_name }}</h1>
+          <p class="sub">Device ID {{ device_id }}. View or download stored configurations.</p>
+        </div>
+        <a class="link-button" href="/">Back to dashboard</a>
+      </header>
+
+      <section class="card">
+        <div class="toolbar">
+          <span class="meta">Total: {{ records | length }}</span>
+        </div>
+        {% if records %}
+          <div class="list">
+            {% for record in records %}
+            <div class="row">
+              <div>
+                <strong>{{ record.timestamp }}</strong>
+                <div class="hash">{{ record.hash }}</div>
+              </div>
+              <div class="row-actions">
+                <span class="size">{{ record.bytes_display }}</span>
+                <a class="link-button" href="/backups/{{ device_id }}/{{ record.file }}/view">View</a>
+                <a class="link-button" href="/backups/{{ device_id }}/{{ record.file }}">Download</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p>No backups yet.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

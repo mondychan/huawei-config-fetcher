@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Huawei Config Fetcher</title>
+    <style>
+      @font-face {
+        font-family: "Brockmann";
+        src: url("/fonts/brockmann-medium.otf") format("opentype");
+        font-weight: 500;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --royal-blue: #3700a6;
+        --dark-blue: #121252;
+        --cyan: #00cfff;
+        --green: #67e796;
+        --yellow: #ceff2d;
+        --ink: #f5f7ff;
+        --muted: #c9ccf2;
+        --card: rgba(255, 255, 255, 0.95);
+        --card-ink: #121252;
+        --card-muted: #4b4e88;
+        --accent: #3700a6;
+        --accent-2: #ceff2d;
+        --stroke: rgba(18, 18, 82, 0.12);
+        --shadow: 0 25px 60px rgba(9, 9, 35, 0.35);
+        --radius: 18px;
+        --gradient: linear-gradient(120deg, var(--cyan), var(--green), var(--yellow));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Brockmann", "Arial", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 12% 12%, rgba(0, 207, 255, 0.25) 0, transparent 45%),
+          radial-gradient(circle at 88% 8%, rgba(103, 231, 150, 0.18) 0, transparent 50%),
+          radial-gradient(circle at 72% 82%, rgba(206, 255, 45, 0.18) 0, transparent 45%),
+          repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 28px),
+          linear-gradient(160deg, #121252 0%, #1f1f6e 45%, #3700a6 100%);
+        min-height: 100vh;
+      }
+
+      .orb {
+        position: fixed;
+        width: 420px;
+        height: 160px;
+        border-radius: 999px;
+        filter: blur(20px);
+        opacity: 0.5;
+        z-index: 0;
+        pointer-events: none;
+        animation: float 16s ease-in-out infinite;
+      }
+
+      .orb.one {
+        background: linear-gradient(120deg, rgba(0, 207, 255, 0.6), rgba(55, 0, 166, 0.2));
+        top: -70px;
+        left: -60px;
+      }
+
+      .orb.two {
+        background: linear-gradient(120deg, rgba(206, 255, 45, 0.6), rgba(103, 231, 150, 0.2));
+        bottom: -120px;
+        right: -80px;
+        animation-delay: -6s;
+      }
+
+      .app {
+        position: relative;
+        z-index: 1;
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 36px 24px 56px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-bottom: 28px;
+        animation: fade-in 0.6s ease-out both;
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 11px;
+        color: var(--yellow);
+        margin: 0 0 8px;
+      }
+
+      h1 {
+        font-size: clamp(28px, 4vw, 40px);
+        margin: 0 0 8px;
+      }
+
+      .sub {
+        margin: 0;
+        color: var(--muted);
+        max-width: 520px;
+      }
+
+      .status-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .pill {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(18, 18, 82, 0.35);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .pill strong {
+        color: var(--yellow);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 20px;
+        border: 1px solid var(--stroke);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+        color: var(--card-ink);
+        animation: rise 0.7s ease-out both;
+        animation-delay: var(--delay, 0s);
+      }
+
+      .card h3 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+
+      .card p {
+        margin: 0 0 12px;
+        color: var(--card-muted);
+      }
+
+      .alert {
+        border-left: 4px solid var(--yellow);
+        padding: 12px 16px;
+        background: rgba(206, 255, 45, 0.18);
+        border-radius: 12px;
+        font-size: 14px;
+      }
+
+      .notice {
+        border-left: 4px solid var(--cyan);
+        padding: 12px 16px;
+        background: rgba(0, 207, 255, 0.12);
+        border-radius: 12px;
+        font-size: 14px;
+      }
+
+      .notice.error {
+        border-left-color: var(--yellow);
+        background: rgba(206, 255, 45, 0.2);
+      }
+
+      .form-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+
+      label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--card-muted);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      input[type="time"],
+      input[type="number"],
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .toggle input {
+        width: 18px;
+        height: 18px;
+      }
+
+      button {
+        border: none;
+        border-radius: 14px;
+        padding: 12px 18px;
+        background: var(--gradient);
+        color: var(--dark-blue);
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(0, 207, 255, 0.25);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        padding: 10px 16px;
+        border: 1px solid rgba(55, 0, 166, 0.3);
+        color: var(--royal-blue);
+        background: rgba(55, 0, 166, 0.08);
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .link-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(55, 0, 166, 0.2);
+      }
+
+      .button-ghost {
+        background: transparent;
+        border: 1px solid rgba(55, 0, 166, 0.4);
+        color: var(--royal-blue);
+      }
+
+      .meta {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--card-muted);
+      }
+
+      .meta strong {
+        color: var(--card-ink);
+      }
+
+      .device-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .device {
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px dashed rgba(18, 18, 82, 0.2);
+        background: rgba(255, 255, 255, 0.85);
+      }
+
+      .device h4 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+
+      .device span {
+        font-size: 12px;
+        color: var(--card-muted);
+      }
+
+      .device summary {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .device details {
+        margin-top: 12px;
+      }
+
+      .details-toggle {
+        cursor: pointer;
+        list-style: none;
+        border-radius: 14px;
+        padding: 10px 16px;
+        border: 1px solid rgba(55, 0, 166, 0.3);
+        color: var(--royal-blue);
+        background: rgba(55, 0, 166, 0.08);
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .details-toggle::-webkit-details-marker {
+        display: none;
+      }
+
+      .details-toggle:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(55, 0, 166, 0.2);
+      }
+
+      .add-device {
+        margin-bottom: 14px;
+      }
+
+      .device-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
+      .button-danger {
+        background: var(--yellow);
+        color: var(--dark-blue);
+      }
+
+      .divider {
+        height: 1px;
+        background: rgba(18, 18, 82, 0.1);
+        margin: 12px 0;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--card-muted);
+      }
+
+      .result-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .result {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--stroke);
+        font-size: 14px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .result span {
+        color: var(--card-muted);
+        word-break: break-all;
+        text-align: right;
+        flex: 1;
+        min-width: 180px;
+      }
+
+      .chip-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+
+      .chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border: 1px solid var(--stroke);
+        background: rgba(255, 255, 255, 0.85);
+      }
+
+      .chip.ok {
+        border-color: rgba(103, 231, 150, 0.7);
+        color: var(--dark-blue);
+      }
+
+      .chip.error {
+        border-color: rgba(206, 255, 45, 0.8);
+        color: var(--dark-blue);
+      }
+
+      .chip.skipped {
+        border-color: rgba(18, 18, 82, 0.3);
+        color: var(--card-muted);
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(18px);
+        }
+      }
+
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .status-row {
+          justify-content: flex-start;
+        }
+        .form-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <main class="app">
+      <header>
+        <div>
+          <p class="eyebrow">Autonomous backup control</p>
+          <h1>Huawei Config Fetcher</h1>
+          <p class="sub">Schedule backups, watch device status, and trigger runs without touching the CLI.</p>
+        </div>
+        <div class="status-row">
+          <span class="pill">Scheduler: <strong>{{ "on" if schedule.enabled else "off" }}</strong></span>
+          <span class="pill">Auto trust: <strong>{{ "on" if auto_trust else "off" }}</strong></span>
+          <span class="pill">Data key: <strong>{{ data_key_source }}</strong></span>
+        </div>
+      </header>
+
+      {% if not config_exists %}
+      <div class="card" style="--delay: 0.05s;">
+        <div class="alert">
+          Config not found at <strong>{{ config_path }}</strong>. Mount a config file or run
+          <strong>hcf init-config</strong> on the host and bind the file into the container.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if error %}
+      <div class="card" style="--delay: 0.06s;">
+        <div class="notice error">{{ error }}</div>
+      </div>
+      {% endif %}
+
+      {% if message %}
+      <div class="card" style="--delay: 0.07s;">
+        <div class="notice">{{ message }}</div>
+      </div>
+      {% endif %}
+
+      <div class="grid">
+        <section class="card" style="--delay: 0.08s;">
+          <h3>Schedule</h3>
+          <p>Pick a start time and an interval in hours. The scheduler recalculates on changes.</p>
+          <form method="post" action="/schedule">
+            <div class="toggle">
+              <input type="checkbox" name="enabled" {% if schedule.enabled %}checked{% endif %} {% if not config_exists %}disabled{% endif %} />
+              <span>Enable automated backups</span>
+            </div>
+            <div class="form-row">
+              <div style="flex: 1;">
+                <label for="schedule_time">Start time</label>
+                <input id="schedule_time" name="schedule_time" type="time" value="{{ schedule.time }}" {% if not config_exists %}disabled{% endif %} />
+              </div>
+              <div style="flex: 1;">
+                <label for="interval_hours">Interval (hours)</label>
+                <input id="interval_hours" name="interval_hours" type="number" min="1" max="168" value="{{ schedule.interval_hours }}" {% if not config_exists %}disabled{% endif %} />
+              </div>
+            </div>
+            <button type="submit" {% if not config_exists %}disabled{% endif %}>Save schedule</button>
+          </form>
+        </section>
+
+        <section class="card" style="--delay: 0.12s;">
+          <h3>Run now</h3>
+          <p>Trigger an immediate backup across all configured devices.</p>
+          <form method="post" action="/run">
+            <button type="submit" {% if status.running or not config_exists %}disabled{% endif %}>Start backup</button>
+            <button type="button" class="button-ghost" disabled>Running: {{ "yes" if status.running else "no" }}</button>
+          </form>
+          <div class="meta" style="margin-top: 16px;">
+            <div>Next run: <strong>{{ status.next_run }}</strong></div>
+            <div>Last run: <strong>{{ status.last_run }}</strong></div>
+            <div>Status: <strong>{{ status.last_run_status }}</strong></div>
+            <div>Duration: <strong>{{ status.last_run_duration }}</strong></div>
+            {% if status.last_error %}
+            <div>Last error: <strong>{{ status.last_error }}</strong></div>
+            {% endif %}
+          </div>
+        </section>
+
+      </div>
+
+      <div class="grid">
+        <section class="card" style="--delay: 0.16s;">
+          <h3>Devices</h3>
+          <p>Configured targets loaded from the mounted config file.</p>
+          <details class="add-device">
+            <summary class="details-toggle">Add device</summary>
+            <form method="post" action="/devices/add">
+              <div class="form-row">
+                <div style="flex: 1;">
+                  <label for="device_name">Name</label>
+                  <input id="device_name" name="name" type="text" placeholder="core-1" {% if not config_exists %}disabled{% endif %} required />
+                </div>
+                <div style="flex: 1;">
+                  <label for="device_host">Host</label>
+                  <input id="device_host" name="host" type="text" placeholder="192.0.2.1" {% if not config_exists %}disabled{% endif %} required />
+                </div>
+              </div>
+              <div class="form-row">
+                <div style="flex: 1;">
+                  <label for="device_port">Port</label>
+                  <input id="device_port" name="port" type="number" min="1" max="65535" value="22" {% if not config_exists %}disabled{% endif %} required />
+                </div>
+                <div style="flex: 1;">
+                  <label for="device_username">Username</label>
+                  <input id="device_username" name="username" type="text" placeholder="admin" {% if not config_exists %}disabled{% endif %} required />
+                </div>
+              </div>
+              <div class="form-row">
+                <div style="flex: 1;">
+                  <label for="device_password">Password</label>
+                  <input id="device_password" name="password" type="password" placeholder="device password" {% if not config_exists %}disabled{% endif %} required />
+                </div>
+              </div>
+              <button type="submit" {% if not config_exists %}disabled{% endif %}>Save device</button>
+            </form>
+          </details>
+          <div class="divider"></div>
+          <div class="device-grid">
+            {% if devices %}
+              {% for device in devices %}
+              <div class="device">
+                <details>
+                  <summary>
+                    <strong>{{ device.name }}</strong>
+                    <span>ID {{ device.id }} - {{ device.host }}:{{ device.port }}</span>
+                  </summary>
+                  <div class="device-actions">
+                    <a class="link-button" href="/backups/{{ device.id }}">View backups</a>
+                  </div>
+                  <form method="post" action="/devices/update">
+                    <input type="hidden" name="device_id" value="{{ device.id }}" />
+                    <div class="form-row">
+                      <div style="flex: 1;">
+                        <label for="name_{{ device.id }}">Name</label>
+                        <input id="name_{{ device.id }}" name="name" type="text" value="{{ device.name }}" {% if not config_exists %}disabled{% endif %} required />
+                      </div>
+                      <div style="flex: 1;">
+                        <label for="host_{{ device.id }}">Host</label>
+                        <input id="host_{{ device.id }}" name="host" type="text" value="{{ device.host }}" {% if not config_exists %}disabled{% endif %} required />
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div style="flex: 1;">
+                        <label for="port_{{ device.id }}">Port</label>
+                        <input id="port_{{ device.id }}" name="port" type="number" min="1" max="65535" value="{{ device.port }}" {% if not config_exists %}disabled{% endif %} required />
+                      </div>
+                      <div style="flex: 1;">
+                        <label for="username_{{ device.id }}">Username</label>
+                        <input id="username_{{ device.id }}" name="username" type="text" value="{{ device.username or "" }}" {% if not config_exists %}disabled{% endif %} required />
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div style="flex: 1;">
+                        <label for="password_{{ device.id }}">Password</label>
+                        <input id="password_{{ device.id }}" name="password" type="password" placeholder="leave blank to keep" {% if not config_exists %}disabled{% endif %} />
+                        <div class="hint">Leave blank to keep current password.</div>
+                      </div>
+                    </div>
+                    <div class="device-actions">
+                      <button type="submit" {% if not config_exists %}disabled{% endif %}>Save changes</button>
+                    </div>
+                  </form>
+                  <form method="post" action="/devices/delete">
+                    <input type="hidden" name="device_id" value="{{ device.id }}" />
+                    <div class="device-actions">
+                      <button type="submit" class="button-danger" {% if not config_exists %}disabled{% endif %}>Remove device</button>
+                    </div>
+                  </form>
+                </details>
+              </div>
+              {% endfor %}
+            {% else %}
+              <p>No devices configured.</p>
+            {% endif %}
+          </div>
+        </section>
+
+        <section class="card" style="--delay: 0.2s;">
+          <h3>Last results</h3>
+          <p>Snapshot of the most recent backup run.</p>
+          {% if results %}
+            <div class="chip-group">
+              {% for key, count in result_counts.items() %}
+              <span class="chip {{ key }}">{{ key }} {{ count }}</span>
+              {% endfor %}
+            </div>
+            <div class="result-list">
+              {% for item in results %}
+              <div class="result">
+                <strong>{{ item.device }}</strong>
+                <span>{{ item.status }}{% if item.hash %} - {{ item.hash }}{% endif %}{% if item.reason %} - {{ item.reason }}{% endif %}</span>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p>No backup results yet.</p>
+          {% endif %}
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

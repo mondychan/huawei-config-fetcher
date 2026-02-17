@@ -27,6 +27,9 @@ class SecurityConfig:
 @dataclass
 class Settings:
     workers: int = 0
+    schedule_enabled: bool = False
+    schedule_time: str = "02:00"
+    schedule_interval_hours: int = 24
 
 
 @dataclass

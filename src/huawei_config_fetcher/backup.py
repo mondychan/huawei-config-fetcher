@@ -14,6 +14,9 @@ from .ssh_client import HostKeyCallback, fetch_device_config
 Result = Dict[str, str]
 ResultCallback = Callable[[Result], None]
 
+MIN_COMPLETE_RATIO = 0.6
+MIN_BYTES_FOR_RATIO = 4096
+
 
 def _auto_workers(device_count: int) -> int:
     cpu = os.cpu_count() or 4
@@ -30,11 +33,40 @@ def _backup_one(
     if not device.username or not device.password_enc:
         return {"device": device.name, "status": "skipped", "reason": "missing-credentials"}
 
+    def last_backup_bytes() -> Optional[int]:
+        manifest_path = storage.device_dir(base_dir, device.id, device.name) / "manifest.json"
+        records = storage.load_manifest(manifest_path)
+        if not records:
+            return None
+        value = records[-1].get("bytes")
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def looks_truncated(output: str, previous_bytes: Optional[int]) -> bool:
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        if not lines:
+            return True
+        last_line = lines[-1].lower()
+        ends_with_return = last_line == "return"
+
+        output_bytes = len(output.encode("utf-8"))
+        if previous_bytes and previous_bytes >= MIN_BYTES_FOR_RATIO:
+            if output_bytes < previous_bytes * MIN_COMPLETE_RATIO:
+                return True
+
+        if not ends_with_return and output_bytes < MIN_BYTES_FOR_RATIO:
+            return True
+
+        return False
+
     try:
         password = decrypt_secret(data_key, device.password_enc)
     except Exception:
         return {"device": device.name, "status": "skipped", "reason": "decrypt-failed"}
 
+    previous_bytes = last_backup_bytes()
     output = fetch_device_config(
         device=device,
         password=password,
@@ -44,6 +76,19 @@ def _backup_one(
 
     if output is None:
         return {"device": device.name, "status": "skipped", "reason": "host-key"}
+
+    if looks_truncated(output, previous_bytes):
+        retry_output = fetch_device_config(
+            device=device,
+            password=password,
+            known_hosts=known_hosts,
+            host_key_callback=host_key_callback,
+        )
+        if retry_output is None:
+            return {"device": device.name, "status": "skipped", "reason": "host-key"}
+        if looks_truncated(retry_output, previous_bytes):
+            return {"device": device.name, "status": "error", "reason": "partial-output"}
+        output = retry_output
 
     record = storage.write_backup(base_dir, device.id, device.name, output)
     return {

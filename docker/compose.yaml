@@ -1,0 +1,13 @@
+services:
+  hcf:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./runtime:/data
+    environment:
+      HCF_MASTER_PASSWORD: "REPLACE_ME"
+      HCF_AUTO_TRUST_HOST_KEYS: "true"
+    restart: unless-stopped

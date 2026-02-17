@@ -1,8 +1,9 @@
 ﻿from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import toml
 
@@ -16,6 +17,15 @@ KEYRING_SERVICE = "huawei-config-fetcher"
 def default_config_path(base_dir: Path | None = None) -> Path:
     root = base_dir or Path.cwd()
     return root / DEFAULT_CONFIG_DIR / DEFAULT_CONFIG_FILE
+
+
+def resolve_config_path(path: Optional[Path] = None) -> Path:
+    if path is not None:
+        return path
+    env_path = os.getenv("HCF_CONFIG_PATH")
+    if env_path:
+        return Path(env_path).expanduser()
+    return default_config_path()
 
 
 def ensure_config_dir(path: Path) -> None:
@@ -42,8 +52,25 @@ def load_config(path: Path) -> Config:
         keyring_user=security_data.get("keyring_user", keyring_user_for_path(path)),
     )
 
+    schedule_enabled = settings_data.get("schedule_enabled", False)
+    if isinstance(schedule_enabled, str):
+        schedule_enabled = schedule_enabled.strip().lower() in {"1", "true", "yes", "on"}
+
+    schedule_time = settings_data.get("schedule_time", Settings.schedule_time)
+    if not isinstance(schedule_time, str) or not schedule_time.strip():
+        schedule_time = Settings.schedule_time
+
+    schedule_interval = settings_data.get("schedule_interval_hours", Settings.schedule_interval_hours)
+    try:
+        schedule_interval = int(schedule_interval)
+    except (TypeError, ValueError):
+        schedule_interval = Settings.schedule_interval_hours
+
     settings = Settings(
         workers=int(settings_data.get("workers", 0)),
+        schedule_enabled=bool(schedule_enabled),
+        schedule_time=schedule_time,
+        schedule_interval_hours=max(1, schedule_interval),
     )
 
     devices = []
@@ -81,6 +108,9 @@ def _config_to_dict(cfg: Config) -> Dict:
         },
         "settings": {
             "workers": cfg.settings.workers,
+            "schedule_enabled": cfg.settings.schedule_enabled,
+            "schedule_time": cfg.settings.schedule_time,
+            "schedule_interval_hours": cfg.settings.schedule_interval_hours,
         },
         "known_hosts": cfg.known_hosts,
         "devices": [

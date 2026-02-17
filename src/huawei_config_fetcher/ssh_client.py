@@ -146,7 +146,7 @@ def fetch_device_config(
         _read_until_quiet(channel, quiet=0.5, overall=5.0)
 
         channel.send("display current-configuration\n")
-        output = _read_until_quiet(channel, quiet=1.0, overall=command_timeout)
+        output = _read_until_quiet(channel, quiet=2.0, overall=command_timeout)
 
         channel.send("quit\n")
         return output.strip()

@@ -20,9 +20,21 @@ dependencies = [
   "cryptography>=42.0.0",
 ]
 
+[project.optional-dependencies]
+web = [
+  "fastapi>=0.110.0",
+  "uvicorn>=0.30.0",
+  "jinja2>=3.1.0",
+  "python-multipart>=0.0.9",
+]
+
 [project.scripts]
 hcf = "huawei_config_fetcher.cli:app"
+hcf-web = "huawei_config_fetcher.web:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["huawei_config_fetcher"]
+
+[tool.setuptools.package-data]
+huawei_config_fetcher = ["templates/*.html"]

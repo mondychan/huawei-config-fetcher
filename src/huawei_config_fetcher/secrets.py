@@ -60,6 +60,18 @@ def unwrap_data_key(master_password: str, salt_b64: str, wrap_nonce_b64: str, wr
     return aesgcm.decrypt(nonce, wrapped, None)
 
 
+def data_key_from_env(salt_b64: str, wrap_nonce_b64: str, wrapped_key_b64: str) -> Optional[bytes]:
+    data_key_b64 = os.getenv("HCF_DATA_KEY_B64")
+    if data_key_b64:
+        return _b64decode(data_key_b64.strip())
+
+    master_password = os.getenv("HCF_MASTER_PASSWORD")
+    if master_password:
+        return unwrap_data_key(master_password, salt_b64, wrap_nonce_b64, wrapped_key_b64)
+
+    return None
+
+
 def encrypt_secret(data_key: bytes, plaintext: str) -> str:
     aesgcm = AESGCM(data_key)
     nonce = os.urandom(12)

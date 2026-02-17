@@ -10,6 +10,9 @@ keyring_user = "REPLACE_ME"
 
 [settings]
 workers = 0
+schedule_enabled = false
+schedule_time = "02:00"
+schedule_interval_hours = 24
 
 [known_hosts]
 "192.0.2.1:22" = "SHA256:REPLACE_ME"
